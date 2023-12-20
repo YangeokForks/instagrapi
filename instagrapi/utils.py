@@ -107,3 +107,8 @@ def date_time_original(localtime):
 def random_delay(delay_range: list):
     """Trigger sleep of a random floating number in range min_sleep to max_sleep"""
     return time.sleep(random.uniform(delay_range[0], delay_range[1]))
+
+
+def generator():
+    while True:
+        yield

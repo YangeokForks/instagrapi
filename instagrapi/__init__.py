@@ -2,7 +2,8 @@ import logging
 from urllib.parse import urlparse
 
 import requests
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
+import urllib3
+from urllib3.exceptions import InsecureRequestWarning
 
 from instagrapi.mixins.account import AccountMixin
 from instagrapi.mixins.album import DownloadAlbumMixin, UploadAlbumMixin
@@ -33,6 +34,7 @@ from instagrapi.mixins.public import (
     PublicRequestMixin,
     TopSearchesPublicMixin,
 )
+from instagrapi.mixins.scrapingbee import ScrapingBeeRequestMixin
 from instagrapi.mixins.share import ShareMixin
 from instagrapi.mixins.story import StoryMixin
 from instagrapi.mixins.timeline import ReelsMixin
@@ -41,13 +43,14 @@ from instagrapi.mixins.track import TrackMixin
 from instagrapi.mixins.user import UserMixin
 from instagrapi.mixins.video import DownloadVideoMixin, UploadVideoMixin
 
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+urllib3.disable_warnings(InsecureRequestWarning)
 
 # Used as fallback logger if another is not provided.
 DEFAULT_LOGGER = logging.getLogger("instagrapi")
 
 
 class Client(
+    ScrapingBeeRequestMixin,
     PublicRequestMixin,
     ChallengeResolveMixin,
     PrivateRequestMixin,
@@ -98,7 +101,6 @@ class Client(
         logger=DEFAULT_LOGGER,
         **kwargs,
     ):
-
         super().__init__(**kwargs)
 
         self.settings = settings

@@ -1,16 +1,28 @@
-import json
 import base64
+import json
+import os
+from datetime import datetime
+from time import sleep
 from typing import List, Tuple
 
-from instagrapi.utils import dumps
-from instagrapi.exceptions import ClientUnauthorizedError, ClientLoginRequired
-from instagrapi.exceptions import ClientError, HashtagNotFound, WrongCursorError
+import dill
+from icecream import ic
+from tqdm import tqdm
+
+from instagrapi.exceptions import (
+    ClientError,
+    ClientLoginRequired,
+    ClientUnauthorizedError,
+    HashtagNotFound,
+    WrongCursorError,
+)
 from instagrapi.extractors import (
     extract_hashtag_gql,
     extract_hashtag_v1,
     extract_media_v1,
 )
 from instagrapi.types import Hashtag, Media
+from instagrapi.utils import dumps, generator
 
 
 class HashtagMixin:
@@ -141,7 +153,12 @@ class HashtagMixin:
         ]
 
     def hashtag_medias_a1_chunk(
-        self, name: str, max_amount: int = 27, tab_key: str = "", end_cursor: str = None
+        self,
+        name: str,
+        max_amount: int = 27,
+        tab_key: str = "",
+        end_cursor: str = None,
+        delay: int = 60,
     ) -> Tuple[List[Media], str]:
         """
         Get chunk of medias and end_cursor by Public Web API
@@ -168,7 +185,7 @@ class HashtagMixin:
         ), 'You must specify one of the options for "tab_key" ("recent" or "top")'
         url = f"/explore/tags/{name}/"
         medias = []
-        while True:
+        for _ in tqdm(generator()):
             params = {"max_id": end_cursor} if end_cursor else {}
             try:
                 data = self.public_a1_request(url, params=params)
@@ -197,6 +214,18 @@ class HashtagMixin:
             if max_amount and len(medias) >= max_amount:
                 break
             end_cursor = result["next_max_id"]
+
+            // FIXME:
+            with open(
+                os.path.join(
+                    os.getcwd(),
+                    f"{name}_{datetime.now().isoformat()}_{end_cursor}_endCursor.pkl",
+                ),
+                "wb",
+            ) as f:
+                dill.dump(media, f)
+            sleep(delay)
+
         return medias, end_cursor
 
     def hashtag_medias_a1(
@@ -271,10 +300,9 @@ class HashtagMixin:
             data["next_media_ids"] = dumps(nm_ids)
         medias = []
         result = self.private_request(
-            f"tags/{name}/sections/",
+            url=f"tags/{name}/sections/",
             # params={"max_id": max_id} if max_id else {},
             data=data,
-            with_signature=False,
         )
         next_max_id = None
         if result.get("next_max_id"):
@@ -298,7 +326,12 @@ class HashtagMixin:
         return medias, next_max_id
 
     def hashtag_medias_v1(
-        self, name: str, amount: int = 27, tab_key: str = ""
+        self,
+        name: str,
+        amount: int = 27,
+        tab_key: str = "",
+        delay: int = 60,
+        max_id: str = None,
     ) -> List[Media]:
         """
         Get medias for a hashtag by Private Mobile API
@@ -318,14 +351,26 @@ class HashtagMixin:
             List of objects of Media
         """
         medias = []
-        max_id = None
-        while True:
+        for _ in tqdm(generator()):
             items, max_id = self.hashtag_medias_v1_chunk(name, amount, tab_key, max_id)
             medias.extend(items)
             if amount and len(medias) >= amount:
                 break
             if not max_id:
+                ic("max_id is None")
                 break
+
+            // FIXME:
+            with open(
+                os.path.join(
+                    os.getcwd(),
+                    f"{name}_{datetime.now().isoformat()}_{max_id}_maxId.pkl",
+                ),
+                "wb",
+            ) as f:
+                dill.dump(items, f)
+            sleep(delay)
+
         if amount:
             medias = medias[:amount]
         return medias
